@@ -924,6 +924,9 @@
   }
   .sheet-search-row input{
     flex: 1 0 0;
+    min-width: 0; /* <input>은 flex-shrink:0이어도 브라우저 기본 최소폭(특히
+                     사파리에서 큼)을 자동으로 갖고 있어, 옆 검색 버튼과 합쳐
+                     좁은 화면에서 줄의 실제 너비를 넘겨 가로 스크롤이 생겼음 */
     height: 40px;
     background: var(--op-bg);
     border: 1px solid var(--op-nav-border);
