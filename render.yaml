@@ -2,10 +2,19 @@ services:
   - type: web
     name: bookcemetery
     env: python
+    # NOTE: Render persistent disks require a paid plan (Starter or above) —
+    # they are not available on "free". The disk below won't actually attach
+    # until this is changed, e.g. to "starter".
     plan: free
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python3 server.py"
     healthCheckPath: /
+    disk:
+      name: sync-data
+      mountPath: /var/data/sync_data
+      sizeGB: 1
     envVars:
       - key: KAKAO_REST_API_KEY
         sync: false
+      - key: SYNC_DATA_DIR
+        value: /var/data/sync_data

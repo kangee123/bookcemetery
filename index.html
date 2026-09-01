@@ -1524,6 +1524,31 @@
     renderSettings();
   }
 
+  // 처음 들어올 때(또는 새로고침할 때) 내 코드로 이미 저장된 서재가 있는지 서버에서
+  // 먼저 확인해서 복원한다. 저장된 적 없는 새 코드면 지금(빈) 상태로 등록해서, 나중에
+  // 이 코드를 다른 곳에서 입력해도 바로 조회는 되게 한다.
+  // 예전엔 이 순서가 반대였다 — 페이지를 열자마자 로컬의 빈 books/archive를 곧장
+  // 서버로 올려버려서, 책을 등록해도 새로고침하면 방금 그 "빈 상태 저장"이 이미
+  // 서버 데이터를 덮어쓴 뒤라 복원할 게 없었다 (동기화가 "저장"은 잘 되는데 "불러오기"
+  // 자체가 아예 없었던 셈).
+  async function restoreOwnData(){
+    try {
+      const res = await fetch('/api/sync/load?code=' + encodeURIComponent(identity.code), { cache: 'no-store' });
+      if (!res.ok) { scheduleSync(); return; } // 아직 서버에 없는 새 코드 — 지금 상태로 등록
+      const data = await res.json();
+      books.push(...reviveBooks(data.books));
+      archive.push(...reviveBooks(data.archive));
+      books.forEach(b => dropStone(b.id, b));
+      updatePileMeta();
+      updateGhosts();
+      showPickButton();
+      renderLibrary();
+      renderSettings();
+    } catch (e) {
+      // 서버에 연결이 안 되면 로컬 빈 상태로 그냥 진행 — 확인도 안 된 채로 덮어쓰진 않는다
+    }
+  }
+
   const settingsCodeEl = document.getElementById('settingsCode');
   const settingsProfileNameEl = document.getElementById('settingsProfileName');
   const settingsProfileSubEl = document.getElementById('settingsProfileSub');
@@ -1857,7 +1882,7 @@
   // (real gravity + collision instead of remembered slot positions/keyframes)
   const books = [];    // currently piled (reading) — 1:1 with physical stones
   const archive = [];  // "다 읽었어요" moves a book here instead of deleting it
-  scheduleSync(); // 처음 들어오자마자 내 코드를 서버에 등록해서, 아무 책도 없어도 다른 기기에서 바로 조회는 되게 한다
+  restoreOwnData(); // 서버에 저장된 내 서재를 먼저 불러온 뒤에야 동기화를 시작한다
   const screenEl = document.querySelector('.screen');
   const pileMeta = document.getElementById('pileMeta');
   const ghostSleepImg = document.getElementById('ghostSleepImg');
