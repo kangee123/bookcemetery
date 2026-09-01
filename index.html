@@ -927,6 +927,8 @@
   }
   .sheet-search-btn{
     width: 64px; height: 40px;
+    flex-shrink: 0; /* 좁은 화면에서 입력칸에 밀려 눌리면 "검색" 글자가 두 줄로 쪼개져 보임 */
+    white-space: nowrap;
     background: var(--op-ink);
     color: var(--op-bg);
     border: none;
