@@ -14,7 +14,7 @@ services:
       mountPath: /var/data/sync_data
       sizeGB: 1
     envVars:
-      - key: KAKAO_REST_API_KEY
+      - key: SEOJI_CERT_KEY
         sync: false
       - key: SYNC_DATA_DIR
         value: /var/data/sync_data

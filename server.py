@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 """
-Local dev server for 병렬독서.
+Local dev server for 미완독묘.
 
 Serves the static files in this folder (index.html and its assets) and
-proxies book search requests to Kakao's Daum Book Search API.
+proxies book search requests to the National Library of Korea's Seoji
+(서지정보) bibliography API.
 
-Why a server at all: Kakao's API takes the key in an Authorization header
-(`KakaoAK {key}`), and it must be sent from server-side code — a plain static
-page calling Kakao directly from the browser would ship the key in every
-request, visible to anyone via devtools. This proxy keeps the key server-side
-(read from .env, never sent to the browser) and hands the frontend back only
-the search results.
+Why a server at all: the Seoji API takes the key as a plain `cert_key` query
+param, and it must be sent from server-side code — a plain static page
+calling it directly from the browser would ship the key in every request,
+visible to anyone via devtools. This proxy keeps the key server-side (read
+from .env, never sent to the browser) and hands the frontend back only the
+search results.
 
 Setup:
   1. cp .env.example .env
-  2. Put your real Kakao REST API key in .env (KAKAO_REST_API_KEY=...)
+  2. Put your real Seoji API key in .env (SEOJI_CERT_KEY=...)
+     (issued at https://www.nl.go.kr/seoji/index.do)
   3. python3 server.py
   4. Open http://localhost:8000/
 """
@@ -27,7 +29,13 @@ import urllib.parse
 import urllib.request
 
 PORT = int(os.environ.get("PORT", 8000))  # Render (and most PaaS hosts) assign this dynamically
-KAKAO_SEARCH_URL = "https://dapi.kakao.com/v3/search/book"
+SEOJI_SEARCH_URL = "https://www.nl.go.kr/seoji/SearchApi.do"
+# 저자 필드에 흔히 붙는 역할 표기 — 이름만 남기고 잘라낸다
+AUTHOR_ROLE_RE = re.compile(
+    r"(저자|지은이|글쓴이|엮은이|옮긴이|편저자|편저|역자|감수|그림|글|사진)\s*[:：]?\s*"
+)
+AUTHOR_SUFFIX_RE = re.compile(r"(지음|옮김|엮음|그림|편저|역|저)$")
+PAGE_NUM_RE = re.compile(r"\d+")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # override via SYNC_DATA_DIR if you attach a Render persistent disk at a different
 # mount path — without one, this directory (and everyone's saved libraries) is wiped
@@ -51,7 +59,7 @@ def load_env(path):
 
 
 _ENV = load_env(os.path.join(BASE_DIR, ".env"))
-KAKAO_API_KEY = os.environ.get("KAKAO_REST_API_KEY") or _ENV.get("KAKAO_REST_API_KEY", "")
+SEOJI_CERT_KEY = os.environ.get("SEOJI_CERT_KEY") or _ENV.get("SEOJI_CERT_KEY", "")
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -121,8 +129,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_json(200, {"ok": True})
 
     def handle_search(self, parsed):
-        if not KAKAO_API_KEY:
-            self.send_json(500, {"error": "서버에 KAKAO_REST_API_KEY가 설정되어 있지 않습니다. .env를 확인해주세요."})
+        if not SEOJI_CERT_KEY:
+            self.send_json(500, {"error": "서버에 SEOJI_CERT_KEY가 설정되어 있지 않습니다. .env를 확인해주세요."})
             return
 
         params = urllib.parse.parse_qs(parsed.query)
@@ -132,22 +140,55 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         size = (params.get("size") or ["10"])[0]
 
-        upstream_qs = urllib.parse.urlencode({"query": query, "size": size})
-        req = urllib.request.Request(
-            f"{KAKAO_SEARCH_URL}?{upstream_qs}",
-            headers={"Authorization": f"KakaoAK {KAKAO_API_KEY}"},
-        )
+        upstream_qs = urllib.parse.urlencode({
+            "cert_key": SEOJI_CERT_KEY,
+            "result_style": "json",
+            "page_no": "1",
+            "page_size": size,
+            "title": query,
+        })
+        req = urllib.request.Request(f"{SEOJI_SEARCH_URL}?{upstream_qs}")
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
-                self.send_json(resp.status, json.loads(resp.read()))
+                raw = json.loads(resp.read())
         except urllib.error.HTTPError as e:
             try:
                 detail = json.loads(e.read())
             except Exception:
                 detail = {"error": str(e)}
             self.send_json(e.code, detail)
+            return
         except Exception as e:
-            self.send_json(502, {"error": f"카카오 API 호출에 실패했습니다: {e}"})
+            self.send_json(502, {"error": f"국립중앙도서관 API 호출에 실패했습니다: {e}"})
+            return
+
+        documents = [self.to_document(doc) for doc in (raw.get("docs") or [])]
+        self.send_json(200, {"documents": documents})
+
+    @staticmethod
+    def to_document(doc):
+        pages = None
+        page_match = PAGE_NUM_RE.search(doc.get("PAGE") or "")
+        if page_match:
+            parsed_pages = int(page_match.group())
+            if parsed_pages > 0:
+                pages = parsed_pages
+
+        authors = []
+        for part in (doc.get("AUTHOR") or "").split(";"):
+            name = AUTHOR_ROLE_RE.sub("", part).strip()
+            name = AUTHOR_SUFFIX_RE.sub("", name).strip()
+            if name:
+                authors.append(name)
+
+        return {
+            "title": doc.get("TITLE") or "",
+            "authors": authors,
+            "thumbnail": doc.get("TITLE_URL") or "",
+            "isbn": doc.get("EA_ISBN") or "",
+            "price": doc.get("PRE_PRICE") or doc.get("REAL_PRICE") or "",
+            "pages": pages,
+        }
 
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -163,8 +204,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(BASE_DIR)
-    if not KAKAO_API_KEY:
-        print("⚠️  KAKAO_REST_API_KEY가 없습니다. .env.example을 .env로 복사하고 키를 채워주세요.")
+    if not SEOJI_CERT_KEY:
+        print("⚠️  SEOJI_CERT_KEY가 없습니다. .env.example을 .env로 복사하고 키를 채워주세요.")
     with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
         print(f"Serving 미완독묘 on http://localhost:{PORT}/  (Ctrl+C to stop)")
         httpd.serve_forever()

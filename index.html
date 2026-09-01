@@ -1763,8 +1763,10 @@
         const d = lastSearchResults[Number(row.dataset.index)];
         if (!d) return;
         // 검색 결과를 고르면 직접입력 폼으로 넘어가서 표지/제목/저자가 채워진 채로 쪽수만 입력하면 됨
+        // (국립중앙도서관 API가 전체쪽수를 주면 자동으로 채우고, 없으면 기존처럼 직접 입력)
         document.getElementById('fTitle').value = stripTags(d.title);
         document.getElementById('fAuthor').value = (d.authors || []).join(', ');
+        document.getElementById('fTotal').value = d.pages || '';
         showFormStep(d.thumbnail, true);
       });
     });
