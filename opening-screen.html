@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>독서유예 — 첫화면 (3단계)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  /*
+    Source: Figma "Book" file (nOvyG9oaBd7mlT1CHNKBjW), node 28:311
+    "2. 첫화면 (3단계)" — one of four opening-screen stage variants
+    (0/1/2/3 -> stage 1-4) that scale the pile + mood by book count.
+    This file reproduces the currently-selected stage-3 variant only,
+    as a standalone screen (not wired into unread-cairn.html).
+  */
+  :root{
+    --op-grad-top: #30383f;
+    --op-grad-bottom: #6e6966;
+    --op-text-oncanvas: #f5f5f5;
+    --op-ink: #2b2a27;
+    --op-ink-faint: #a8a29a;
+    --op-ground: #696563;
+    --op-nav-bg: #fbfaf7;
+    --op-nav-border: #ddd8cf;
+    --op-fab-bg: #2b2a27;
+    --op-fab-fg: #f4f2ee;
+  }
+
+  *{ box-sizing: border-box; }
+  html, body{ height: 100%; margin: 0; }
+  body{
+    background: #1c1b19;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .screen{
+    position: relative;
+    width: 390px;
+    height: 844px;
+    overflow: hidden;
+    border-radius: 44px;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+    background: linear-gradient(to bottom, var(--op-grad-top) 8.827%, var(--op-grad-bottom) 75.059%);
+  }
+
+  /* ---------- status bar ---------- */
+  .status-bar{
+    position: absolute;
+    left: 0; top: 0; width: 100%; height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px;
+    color: var(--op-text-oncanvas);
+    font-size: 15px;
+    font-weight: 600;
+    z-index: 5;
+  }
+  .status-icons{ display: flex; align-items: center; gap: 6px; }
+  .status-icons svg{ display: block; }
+
+  /* ---------- header text ---------- */
+  .op-title{
+    position: absolute;
+    left: 24px; top: 84px;
+    margin: 0;
+    font-family: 'Noto Serif KR', serif;
+    font-weight: 600;
+    font-size: 26px;
+    letter-spacing: -0.26px;
+    color: var(--op-text-oncanvas);
+    white-space: nowrap;
+  }
+  .op-sub{
+    position: absolute;
+    left: 24px; top: 132px;
+    margin: 0;
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--op-text-oncanvas);
+    white-space: nowrap;
+  }
+  .op-meta{
+    position: absolute;
+    left: 24px; top: 159px;
+    margin: 0;
+    font-size: 12.5px;
+    font-weight: 400;
+    color: var(--op-text-oncanvas);
+    white-space: nowrap;
+  }
+
+  /* ---------- ground ---------- */
+  .ground{
+    position: absolute;
+    left: 0; top: 721px;
+    width: 390px; height: 59px;
+    background: var(--op-ground);
+  }
+
+  /* ---------- cairn stones ---------- */
+  .stone-slot{
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .stone-rot{ position: relative; flex-shrink: 0; }
+  .stone-img{
+    position: absolute;
+    top: 0; left: 1.25%; right: 1.25%; bottom: 4.95%;
+    width: auto; height: auto;
+    display: block;
+  }
+  .stone-label{
+    position: absolute;
+    transform: translateX(-50%);
+    margin: 0;
+    font-family: 'Noto Serif KR', serif;
+    font-weight: 500;
+    line-height: 1.15;
+    color: var(--op-ink);
+    text-align: center;
+    word-break: keep-all;
+  }
+
+  /* ---------- mascot + plants ---------- */
+  .mascot{
+    position: absolute;
+    left: 153px; top: 469px;
+    width: 94.3242px; height: 76.7142px;
+  }
+  .plant{
+    position: absolute;
+    top: 684px;
+    width: 62px; height: 39px;
+  }
+  .plant-left{ left: 63px; }
+  .plant-right{ left: 238px; }
+
+  /* ---------- FAB ---------- */
+  .fab{
+    position: absolute;
+    left: 316px; top: 693px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--op-fab-bg);
+    color: var(--op-fab-fg);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 300;
+    font-size: 24px;
+    box-shadow: 0 1px 2px rgba(30,28,22,0.06), 0 8px 24px rgba(30,28,22,0.06);
+    cursor: pointer;
+  }
+
+  /* ---------- bottom nav ---------- */
+  .bottom-nav{
+    position: absolute;
+    left: 0; top: 780px;
+    width: 390px; height: 64px;
+    display: flex;
+    background: var(--op-nav-bg);
+    border-top: 1px solid var(--op-nav-border);
+  }
+  .nav-tab{
+    flex: 1 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 10px 0;
+  }
+  .nav-tab img{ width: 24px; height: 24px; }
+  .nav-tab span{ font-size: 11.5px; }
+  .nav-tab.active span{ font-weight: 500; color: var(--op-ink); }
+  .nav-tab:not(.active) span{ color: var(--op-ink-faint); }
+  .nav-tab:nth-child(3) span{ font-weight: 400; }
+</style>
+</head>
+<body>
+
+<div class="screen">
+
+  <div class="status-bar">
+    <span>9:41</span>
+    <div class="status-icons" aria-hidden="true">
+      <svg width="18" height="12" viewBox="0 0 18 12" fill="none"><path d="M1 9 L1 11 L3 11 L3 9 Z M5 6 L5 11 L7 11 L7 6 Z M9 4 L9 11 L11 11 L11 4 Z M13 1 L13 11 L15 11 L15 1 Z" fill="currentColor"/></svg>
+      <svg width="16" height="12" viewBox="0 0 16 12" fill="none"><path d="M8 10.2c.5 0 1-.2 1.3-.5l-1.3-1.3-1.3 1.3c.3.3.8.5 1.3.5Zm-3.1-2.6c.8-.8 1.9-1.3 3.1-1.3s2.3.5 3.1 1.3l1.1-1.1C11 5.3 9.6 4.7 8 4.7s-3 .6-4.2 1.8l1.1 1.1Zm-2.2-2.2C4.2 3.9 6 3.2 8 3.2s3.8.7 5.3 2.2l1.1-1.1C12.5 2.4 10.3 1.5 8 1.5s-4.5.9-6.4 2.8l1.1 1.1Z" fill="currentColor"/></svg>
+      <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="1" y="1" width="20" height="10" rx="2.5" stroke="currentColor" stroke-opacity="0.5"/><rect x="2.5" y="2.5" width="14" height="7" rx="1.5" fill="currentColor"/><path d="M23 4.5v3c.8-.3 1.3-1 1.3-1.5s-.5-1.2-1.3-1.5Z" fill="currentColor" fill-opacity="0.5"/></svg>
+    </div>
+  </div>
+
+  <h1 class="op-title">독서유예</h1>
+  <p class="op-sub">읽으려고 했다는 것도, 독서니까.</p>
+  <p class="op-meta">N권 쌓임 · 8월 28일 마지막 올림</p>
+
+  <div class="ground"></div>
+
+  <!-- cairn: 11 stones, positions/rotations/labels ported 1:1 from Figma node 28:311 -->
+
+  <div class="stone-slot" style="left:90px; top:635px; width:107.625px; height:102.722px;">
+    <div class="stone-rot" style="width:96px; height:90.24px; transform:rotate(8deg);">
+      <img class="stone-img" src="opening-screen-assets/stone1.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:143.8px; top:675.16px; width:81.6px; font-size:11.5px;">미움받을 용기</p>
+
+  <div class="stone-slot" style="left:181px; top:637px; width:101.027px; height:96.744px;">
+    <div class="stone-rot" style="width:88px; height:82.72px; transform:rotate(-10deg);">
+      <img class="stone-img" src="opening-screen-assets/stone2.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:231.84px; top:677.68px; width:74.8px; font-size:11.44px;">사피엔스</p>
+
+  <div class="stone-slot" style="left:203px; top:552px; width:67.996px; height:66.523px;">
+    <div class="stone-rot" style="width:52.013px; height:48.892px; transform:rotate(25.5deg);">
+      <img class="stone-img" src="opening-screen-assets/stone9.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:236.8px; top:578px; width:47.6px; font-size:9px;">책제목</p>
+
+  <div class="stone-slot" style="left:8px; top:640px; width:103.351px; height:101.112px;">
+    <div class="stone-rot" style="width:79.057px; height:74.314px; transform:rotate(25.5deg);">
+      <img class="stone-img" src="opening-screen-assets/stone10.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:59.5px; top:684px; width:65px; height:18px; font-size:9px;">책제목</p>
+
+  <div class="stone-slot" style="left:147px; top:577px; width:93.421px; height:90.012px;">
+    <div class="stone-rot" style="width:78px; height:73.32px; transform:rotate(14deg);">
+      <img class="stone-img" src="opening-screen-assets/stone3.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:193.75px; top:617px; width:59.5px; font-size:9.1px;">모비딕</p>
+
+  <div class="stone-slot" style="left:160px; top:503px; width:84.812px; height:81.717px;">
+    <div class="stone-rot" style="width:70.812px; height:66.564px; transform:rotate(14deg);">
+      <img class="stone-img" src="opening-screen-assets/stone12.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:201.75px; top:539px; width:59.5px; font-size:9.1px;">책제목</p>
+
+  <div class="stone-slot" style="left:73px; top:571px; width:91.418px; height:90.083px;">
+    <div class="stone-rot" style="width:68px; height:63.92px; transform:rotate(-31.62deg);">
+      <img class="stone-img" src="opening-screen-assets/stone5.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:118.8px; top:609px; width:47.6px; font-size:9px;">진실</p>
+
+  <div class="stone-slot" style="left:258px; top:633px; width:91.418px; height:90.083px;">
+    <div class="stone-rot" style="width:68px; height:63.92px; transform:rotate(-31.62deg);">
+      <img class="stone-img" src="opening-screen-assets/stone5.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:303.8px; top:671px; width:47.6px; font-size:9px;">진실2</p>
+
+  <div class="stone-slot" style="left:232px; top:596px; width:65.567px; height:62.363px;">
+    <div class="stone-rot" style="width:60px; height:56.4px; transform:rotate(6deg);">
+      <img class="stone-img" src="opening-screen-assets/stone6.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:267.84px; top:610.24px; width:51px; font-size:9px;">참을 수 없는 존재의 가벼움</p>
+
+  <div class="stone-slot" style="left:119px; top:539px; width:65.721px; height:63.133px;">
+    <div class="stone-rot" style="width:56px; height:52.64px; transform:rotate(-12deg);">
+      <img class="stone-img" src="opening-screen-assets/stone7.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:150.24px; top:564px; width:47.6px; font-size:9px;">1984</p>
+
+  <div class="stone-slot" style="left:32px; top:598px; width:65.721px; height:63.133px;">
+    <div class="stone-rot" style="width:56px; height:52.64px; transform:rotate(-12deg);">
+      <img class="stone-img" src="opening-screen-assets/stone7.svg" alt="">
+    </div>
+  </div>
+  <p class="stone-label" style="left:63.24px; top:623px; width:47.6px; font-size:9px;">책제목</p>
+
+  <img class="mascot" src="opening-screen-assets/ghost-mascot.svg" alt="">
+  <img class="plant plant-left" src="opening-screen-assets/plant-left.svg" alt="">
+  <img class="plant plant-right" src="opening-screen-assets/plant-right.svg" alt="">
+
+  <button class="fab" aria-label="책 추가">+</button>
+
+  <nav class="bottom-nav">
+    <div class="nav-tab active">
+      <img src="opening-screen-assets/icon-home.svg" alt="">
+      <span>Home</span>
+    </div>
+    <div class="nav-tab">
+      <img src="opening-screen-assets/icon-book5.svg" alt="">
+      <span>서재</span>
+    </div>
+    <div class="nav-tab">
+      <img src="opening-screen-assets/icon-edit-calendar.svg" alt="">
+      <span>기록</span>
+    </div>
+  </nav>
+
+</div>
+
+</body>
+</html>

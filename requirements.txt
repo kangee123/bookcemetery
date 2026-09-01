@@ -1,0 +1,2 @@
+# server.py only uses the Python standard library — nothing to install here.
+# This file exists so Render's Python buildpack has something to find.

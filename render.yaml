@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: byeongryeol-dokseo
+    env: python
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python3 server.py"
+    healthCheckPath: /opening-screen-stage1.html
+    envVars:
+      - key: KAKAO_REST_API_KEY
+        sync: false
