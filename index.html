@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>미완독묘</title>
 <meta property="og:title" content="bookcemetery" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -61,6 +61,13 @@
     box-shadow: none;
     background: var(--op-canvas-bg);
     transition: background 0.6s ease;
+    /* with viewport-fit=cover the page draws under the notch/home-indicator —
+       the background (painted edge-to-edge) is fine there, but everything else
+       is absolutely positioned relative to .screen's *padding* box, so insetting
+       here pulls the nav, title, sheets etc. back in from those areas for free,
+       with zero effect on devices that don't have any (env() just resolves 0) */
+    padding: env(safe-area-inset-top) env(safe-area-inset-right)
+             env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   /* ---------- responsive breakpoints ----------
      .screen is always full-bleed (100vw/100vh, no rounded corners, no shadow) at
@@ -96,6 +103,16 @@
     width: 390px; height: 780px;
     transform-origin: bottom center;
     transform: translateX(-50%) scale(var(--pile-scale, 1));
+  }
+  /* iOS Safari zooms the whole page in when you tap a text field whose computed
+     font-size is under 16px — force every text input/textarea up to exactly
+     that threshold on phones, where it actually matters (desktop/tablet keep
+     their designed sizes, since this can only happen on a touchscreen anyway).
+     !important because this needs to win over every individual input's own
+     font-size rule (search bars, form fields, settings inputs, etc.) rather
+     than chasing each one's selector specificity. */
+  @media (max-width: 767px){
+    input, textarea, select{ font-size: 16px !important; }
   }
   /* Figma "2. 첫화면 (3단계)" — kicks in once the pile passes 5 books, per request */
   .screen.dark-mode{
