@@ -51,6 +51,10 @@
     align-items: center;
     justify-content: center;
     min-height: 100vh;
+    /* 모바일 사파리/크롬은 주소창이 접혔다 펼쳐지며 100vh가 실제 보이는 높이보다
+       커져서 바디에 스크롤이 생긴다 (인앱 브라우저는 자체 UI가 고정이라 문제없음) —
+       100dvh는 실제 보이는 높이를 따라가므로, 지원하는 브라우저에서 이 값으로 덮어쓴다 */
+    min-height: 100dvh;
     font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
     -webkit-font-smoothing: antialiased;
   }
@@ -63,6 +67,7 @@
     position: relative;
     width: 100vw;
     height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     border-radius: 0;
     box-shadow: none;
