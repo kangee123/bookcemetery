@@ -3,20 +3,23 @@
 Local dev server for 미완독묘.
 
 Serves the static files in this folder (index.html and its assets) and
-proxies book search requests to the National Library of Korea's Seoji
-(서지정보) bibliography API.
+proxies two kinds of book-lookup requests:
+  - search (title/author -> candidate list): Kakao's Daum Book Search API
+  - total page count for a selected book: National Library of Korea's
+    Seoji (서지정보) bibliography API, looked up by ISBN/title
 
-Why a server at all: the Seoji API takes the key as a plain `cert_key` query
-param, and it must be sent from server-side code — a plain static page
-calling it directly from the browser would ship the key in every request,
-visible to anyone via devtools. This proxy keeps the key server-side (read
-from .env, never sent to the browser) and hands the frontend back only the
-search results.
+Why a server at all: both APIs take their key server-side (Kakao via an
+`Authorization: KakaoAK {key}` header, Seoji via a `cert_key` query param),
+and a plain static page calling either directly from the browser would ship
+the key in every request, visible to anyone via devtools. This proxy keeps
+both keys server-side (read from .env, never sent to the browser) and hands
+the frontend back only the results.
 
 Setup:
   1. cp .env.example .env
-  2. Put your real Seoji API key in .env (SEOJI_CERT_KEY=...)
-     (issued at https://www.nl.go.kr/seoji/index.do)
+  2. Put your real keys in .env:
+       KAKAO_REST_API_KEY=... (developers.kakao.com > 내 애플리케이션 > REST API 키)
+       SEOJI_CERT_KEY=...     (seoji.nl.go.kr > 인증키 신청)
   3. python3 server.py
   4. Open http://localhost:8000/
 """
@@ -29,12 +32,8 @@ import urllib.parse
 import urllib.request
 
 PORT = int(os.environ.get("PORT", 8000))  # Render (and most PaaS hosts) assign this dynamically
+KAKAO_SEARCH_URL = "https://dapi.kakao.com/v3/search/book"
 SEOJI_SEARCH_URL = "https://www.nl.go.kr/seoji/SearchApi.do"
-# 저자 필드에 흔히 붙는 역할 표기 — 이름만 남기고 잘라낸다
-AUTHOR_ROLE_RE = re.compile(
-    r"(저자|지은이|글쓴이|엮은이|옮긴이|편저자|편저|역자|감수|그림|글|사진)\s*[:：]?\s*"
-)
-AUTHOR_SUFFIX_RE = re.compile(r"(지음|옮김|엮음|그림|편저|역|저)$")
 PAGE_NUM_RE = re.compile(r"\d+")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # override via SYNC_DATA_DIR if you attach a Render persistent disk at a different
@@ -59,6 +58,7 @@ def load_env(path):
 
 
 _ENV = load_env(os.path.join(BASE_DIR, ".env"))
+KAKAO_API_KEY = os.environ.get("KAKAO_REST_API_KEY") or _ENV.get("KAKAO_REST_API_KEY", "")
 SEOJI_CERT_KEY = os.environ.get("SEOJI_CERT_KEY") or _ENV.get("SEOJI_CERT_KEY", "")
 
 
@@ -69,6 +69,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # serves index.html for the bare directory root by default
         if parsed.path == "/api/search-books":
             self.handle_search(parsed)
+            return
+        if parsed.path == "/api/book-pages":
+            self.handle_book_pages(parsed)
             return
         if parsed.path == "/api/sync/load":
             self.handle_sync_load(parsed)
@@ -129,8 +132,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.send_json(200, {"ok": True})
 
     def handle_search(self, parsed):
-        if not SEOJI_CERT_KEY:
-            self.send_json(500, {"error": "서버에 SEOJI_CERT_KEY가 설정되어 있지 않습니다. .env를 확인해주세요."})
+        if not KAKAO_API_KEY:
+            self.send_json(500, {"error": "서버에 KAKAO_REST_API_KEY가 설정되어 있지 않습니다. .env를 확인해주세요."})
             return
 
         params = urllib.parse.parse_qs(parsed.query)
@@ -140,55 +143,92 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             return
         size = (params.get("size") or ["10"])[0]
 
-        upstream_qs = urllib.parse.urlencode({
-            "cert_key": SEOJI_CERT_KEY,
-            "result_style": "json",
-            "page_no": "1",
-            "page_size": size,
-            "title": query,
-        })
-        req = urllib.request.Request(f"{SEOJI_SEARCH_URL}?{upstream_qs}")
+        upstream_qs = urllib.parse.urlencode({"query": query, "size": size})
+        req = urllib.request.Request(
+            f"{KAKAO_SEARCH_URL}?{upstream_qs}",
+            headers={"Authorization": f"KakaoAK {KAKAO_API_KEY}"},
+        )
         try:
             with urllib.request.urlopen(req, timeout=8) as resp:
-                raw = json.loads(resp.read())
+                self.send_json(resp.status, json.loads(resp.read()))
         except urllib.error.HTTPError as e:
             try:
                 detail = json.loads(e.read())
             except Exception:
                 detail = {"error": str(e)}
             self.send_json(e.code, detail)
-            return
         except Exception as e:
-            self.send_json(502, {"error": f"국립중앙도서관 API 호출에 실패했습니다: {e}"})
+            self.send_json(502, {"error": f"카카오 API 호출에 실패했습니다: {e}"})
+
+    def handle_book_pages(self, parsed):
+        # 카카오 검색 결과에는 전체 쪽수가 없으므로, 사용자가 검색 결과를 고른 시점에
+        # 국립중앙도서관 서지정보로 쪽수만 보충 조회한다. 못 찾으면 pages: null을 돌려주고
+        # 프런트엔드가 기존처럼 직접 입력 폴백을 그대로 쓰게 한다.
+        if not SEOJI_CERT_KEY:
+            self.send_json(200, {"pages": None})
             return
 
-        documents = [self.to_document(doc) for doc in (raw.get("docs") or [])]
-        self.send_json(200, {"documents": documents})
+        params = urllib.parse.parse_qs(parsed.query)
+        isbn = (params.get("isbn") or [""])[0].strip()
+        title = (params.get("title") or [""])[0].strip()
+        if not isbn and not title:
+            self.send_json(400, {"error": "isbn 또는 title 파라미터가 필요합니다."})
+            return
+
+        pages = None
+        if isbn:
+            pages = self.lookup_pages_by_isbn(isbn)
+        if pages is None and title:
+            pages = self.lookup_pages_by_title(title)
+        self.send_json(200, {"pages": pages})
 
     @staticmethod
-    def to_document(doc):
-        pages = None
-        page_match = PAGE_NUM_RE.search(doc.get("PAGE") or "")
-        if page_match:
-            parsed_pages = int(page_match.group())
-            if parsed_pages > 0:
-                pages = parsed_pages
+    def seoji_docs(extra_params):
+        qs = urllib.parse.urlencode({
+            "cert_key": SEOJI_CERT_KEY,
+            "result_style": "json",
+            "page_no": "1",
+            **extra_params,
+        })
+        with urllib.request.urlopen(f"{SEOJI_SEARCH_URL}?{qs}", timeout=6) as resp:
+            return json.loads(resp.read()).get("docs") or []
 
-        authors = []
-        for part in (doc.get("AUTHOR") or "").split(";"):
-            name = AUTHOR_ROLE_RE.sub("", part).strip()
-            name = AUTHOR_SUFFIX_RE.sub("", name).strip()
-            if name:
-                authors.append(name)
+    @classmethod
+    def lookup_pages_by_isbn(cls, isbn):
+        # 카카오 isbn 필드는 "ISBN10 ISBN13"처럼 공백으로 여러 코드가 붙어 오므로,
+        # 더 특정적인 13자리 코드부터 시도한다.
+        codes = sorted(isbn.split(), key=len, reverse=True)
+        for code in codes:
+            try:
+                docs = cls.seoji_docs({"page_size": "1", "isbn": code})
+            except Exception:
+                continue
+            if docs:
+                pages = cls.parse_pages(docs[0].get("PAGE"))
+                if pages:
+                    return pages
+        return None
 
-        return {
-            "title": doc.get("TITLE") or "",
-            "authors": authors,
-            "thumbnail": doc.get("TITLE_URL") or "",
-            "isbn": doc.get("EA_ISBN") or "",
-            "price": doc.get("PRE_PRICE") or doc.get("REAL_PRICE") or "",
-            "pages": pages,
-        }
+    @classmethod
+    def lookup_pages_by_title(cls, title):
+        try:
+            docs = cls.seoji_docs({"page_size": "5", "title": title})
+        except Exception:
+            return None
+        for doc in docs:
+            if (doc.get("TITLE") or "").strip() == title:
+                pages = cls.parse_pages(doc.get("PAGE"))
+                if pages:
+                    return pages
+        return None
+
+    @staticmethod
+    def parse_pages(raw):
+        match = PAGE_NUM_RE.search(raw or "")
+        if not match:
+            return None
+        n = int(match.group())
+        return n if n > 0 else None
 
     def send_json(self, status, payload):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -204,8 +244,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(BASE_DIR)
+    if not KAKAO_API_KEY:
+        print("⚠️  KAKAO_REST_API_KEY가 없습니다. .env.example을 .env로 복사하고 키를 채워주세요.")
     if not SEOJI_CERT_KEY:
-        print("⚠️  SEOJI_CERT_KEY가 없습니다. .env.example을 .env로 복사하고 키를 채워주세요.")
+        print("⚠️  SEOJI_CERT_KEY가 없습니다. 전체 쪽수 자동 입력이 동작하지 않습니다.")
     with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
         print(f"Serving 미완독묘 on http://localhost:{PORT}/  (Ctrl+C to stop)")
         httpd.serve_forever()

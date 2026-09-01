@@ -1082,6 +1082,19 @@
     font-weight: 500;
     cursor: pointer;
   }
+  .form-back-btn{
+    width: 100%;
+    padding: 11px;
+    margin-top: 8px;
+    border-radius: 10px;
+    border: 1px solid var(--op-ink);
+    background: transparent;
+    color: var(--op-ink);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 14.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
 
   /* ---------- book detail sheet (Figma "5. 책 상세보기") ---------- */
   .detail-row{
@@ -1304,6 +1317,7 @@
             </div>
           </div>
           <button class="submit-btn" id="submitFormBtn">무덤에 올리기</button>
+          <button class="form-back-btn" id="formBackBtn">뒤로가기</button>
         </div>
       </div>
     </div>
@@ -1763,13 +1777,35 @@
         const d = lastSearchResults[Number(row.dataset.index)];
         if (!d) return;
         // 검색 결과를 고르면 직접입력 폼으로 넘어가서 표지/제목/저자가 채워진 채로 쪽수만 입력하면 됨
-        // (국립중앙도서관 API가 전체쪽수를 주면 자동으로 채우고, 없으면 기존처럼 직접 입력)
-        document.getElementById('fTitle').value = stripTags(d.title);
+        const title = stripTags(d.title);
+        document.getElementById('fTitle').value = title;
         document.getElementById('fAuthor').value = (d.authors || []).join(', ');
-        document.getElementById('fTotal').value = d.pages || '';
+        document.getElementById('fTotal').value = '';
         showFormStep(d.thumbnail, true);
+        // 카카오 검색 결과엔 전체쪽수가 없어서, 국립중앙도서관 서지정보로 별도 보충 조회한다.
+        // 못 찾으면 fTotal은 빈 채로 남아 기존 직접 입력 폴백이 그대로 동작한다.
+        fetchAndFillPages(d.isbn, title);
       });
     });
+  }
+
+  let pagesRequestSeq = 0;
+
+  function fetchAndFillPages(isbn, title){
+    const seq = ++pagesRequestSeq;
+    const qs = new URLSearchParams();
+    if (isbn) qs.set('isbn', isbn);
+    if (title) qs.set('title', title);
+    fetch(`/api/book-pages?${qs.toString()}`)
+      .then(res => res.json())
+      .then(data => {
+        if (seq !== pagesRequestSeq) return; // 그 사이 다른 책을 고르면 무시
+        const totalInput = document.getElementById('fTotal');
+        if (data && data.pages && !totalInput.value) {
+          totalInput.value = data.pages;
+        }
+      })
+      .catch(() => {});
   }
 
   let searchRequestSeq = 0;
@@ -1811,6 +1847,7 @@
   const formCoverInput = document.getElementById('formCoverInput');
   const fTitleInput = document.getElementById('fTitle');
   const fAuthorInput = document.getElementById('fAuthor');
+  const formBackBtn = document.getElementById('formBackBtn');
 
   // 검색 결과에서 고른 책인지(제목/저자 수정 불가) 직접 입력한 책인지(수정 가능) 기억해둔다
   let currentFormThumbnail = '';
@@ -1833,6 +1870,9 @@
     fTitleInput.readOnly = currentFormFromApi;
     fAuthorInput.readOnly = currentFormFromApi;
     formCoverWrap.classList.toggle('locked', currentFormFromApi); // API 표지는 갈아끼울 수 없다
+    // 검색 결과에서 왔으면 검색 목록으로 되돌아가는 "뒤로가기", 직접 입력을 바로
+    // 눌러서 왔으면 등록 자체를 그만두는 "취소하기"로 버튼 문구/동작이 달라진다
+    formBackBtn.textContent = currentFormFromApi ? '뒤로가기' : '취소하기';
   }
 
   // 표지 사진 직접 올리기 — 정사각형으로 자를 필요 없이(책 표지는 원래 세로가 김),
@@ -1903,6 +1943,15 @@
   });
 
   document.getElementById('manualEntryBtn').addEventListener('click', () => showFormStep());
+
+  formBackBtn.addEventListener('click', () => {
+    if (currentFormFromApi) {
+      showSearchStep(); // 검색 결과에서 왔으면 목록으로만 되돌아간다
+    } else {
+      overlay.classList.remove('open'); // 직접 입력으로 바로 왔으면 등록 자체를 취소한다
+      resetAddBookSheet();
+    }
+  });
 
   // --- pile physics — ported from unread-cairn.html's Matter.js setup ---
   // (real gravity + collision instead of remembered slot positions/keyframes)
