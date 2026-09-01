@@ -830,6 +830,13 @@
     transform: translate(-50%, 100%);
     transition: transform 0.25s cubic-bezier(0.22,0.9,0.3,1);
   }
+  /* 책 등록 시트는 검색 결과 목록(길어질 수 있음)일 땐 450px 안에서 스크롤하고,
+     직접 입력 폼(항상 짧음)일 땐 내용만큼만 높이가 줄어들어야 버튼 아래 여백이
+     과하게 남지 않는다 */
+  #addBookOverlay .sheet{
+    height: auto;
+    max-height: 450px;
+  }
   .sheet-overlay.open .sheet{ transform: translate(-50%, 0); }
   /* mobile: match the sheet's width to the actual device viewport instead of a
      fixed 390px — narrower phones were getting clipped at the edges, wider ones
