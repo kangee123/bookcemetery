@@ -2,8 +2,8 @@
 """
 Local dev server for 병렬독서.
 
-Serves the static files in this folder (opening-screen-stage1.html and its
-assets) and proxies book search requests to Kakao's Daum Book Search API.
+Serves the static files in this folder (index.html and its assets) and
+proxies book search requests to Kakao's Daum Book Search API.
 
 Why a server at all: Kakao's API takes the key in an Authorization header
 (`KakaoAK {key}`), and it must be sent from server-side code — a plain static
@@ -16,7 +16,7 @@ Setup:
   1. cp .env.example .env
   2. Put your real Kakao REST API key in .env (KAKAO_REST_API_KEY=...)
   3. python3 server.py
-  4. Open http://localhost:8000/opening-screen-stage1.html
+  4. Open http://localhost:8000/
 """
 import http.server
 import json
@@ -57,13 +57,8 @@ KAKAO_API_KEY = os.environ.get("KAKAO_REST_API_KEY") or _ENV.get("KAKAO_REST_API
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
-        if parsed.path == "/":
-            # bare domain (and Render's health check) — send straight to the app
-            # instead of a directory listing
-            self.send_response(302)
-            self.send_header("Location", "/opening-screen-stage1.html")
-            self.end_headers()
-            return
+        # no special-casing needed for "/" — SimpleHTTPRequestHandler already
+        # serves index.html for the bare directory root by default
         if parsed.path == "/api/search-books":
             self.handle_search(parsed)
             return
@@ -171,5 +166,5 @@ if __name__ == "__main__":
     if not KAKAO_API_KEY:
         print("⚠️  KAKAO_REST_API_KEY가 없습니다. .env.example을 .env로 복사하고 키를 채워주세요.")
     with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
-        print(f"Serving 병렬독서 on http://localhost:{PORT}/opening-screen-stage1.html  (Ctrl+C to stop)")
+        print(f"Serving 미완독묘 on http://localhost:{PORT}/  (Ctrl+C to stop)")
         httpd.serve_forever()
