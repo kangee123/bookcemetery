@@ -52,7 +52,11 @@
   }
 
   *{ box-sizing: border-box; }
-  html, body{ height: 100%; margin: 0; }
+  /* overflow-x:hidden은 안전망 — 100vw는 스크롤바가 있는 환경(특히 일부 모바일
+     인앱 브라우저)에서 실제 보이는 너비보다 커질 수 있어 본문에 가로 스크롤이
+     생긴다. .screen은 아래에서 100%로 고쳤지만, 혹시 모를 미세한 폭 오차까지
+     확실히 막기 위해 html/body 레벨에서 가로 스크롤 자체를 막아둔다 */
+  html, body{ height: 100%; margin: 0; overflow-x: hidden; }
   body{
     background: #1c1b19;
     display: flex;
@@ -73,7 +77,8 @@
      just fills whatever it's given, at every breakpoint. */
   .screen{
     position: relative;
-    width: 100vw;
+    width: 100%; /* 100vw였음 — 스크롤바가 있는 환경에서 실제 너비보다 커져
+                    가로 스크롤을 유발할 수 있어 부모(body) 기준 100%로 변경 */
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
