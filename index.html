@@ -963,7 +963,8 @@
     display: flex;
     flex-direction: column;
     gap: 2px;
-    width: 350px;
+    width: 100%; /* 원래 390px 고정 시트 기준 350px였음 — 390px보다 좁은 폰에서
+                    가로 스크롤이 생겨 시트 너비에 맞춰 늘어나게 함 */
   }
   .search-results.hidden{ display: none; }
   .result-item{
