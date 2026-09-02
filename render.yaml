@@ -2,10 +2,11 @@ services:
   - type: web
     name: bookcemetery
     env: python
-    # NOTE: Render persistent disks require a paid plan (Starter or above) —
-    # they are not available on "free". The disk below won't actually attach
-    # until this is changed, e.g. to "starter".
-    plan: free
+    # Persistent disks (below) require a paid plan — not available on "free".
+    # sync_data/ (each user's saved library, keyed by sync code) lives on this
+    # disk; without it, every redeploy/restart wipes that data since the
+    # container filesystem is otherwise ephemeral.
+    plan: starter
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python3 server.py"
     healthCheckPath: /
