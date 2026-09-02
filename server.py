@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Local dev server for 미완독묘.
+Local dev server for 읽다말다.
 
 Serves the static files in this folder (index.html and its assets) and
 proxies two kinds of book-lookup requests:
@@ -249,5 +249,5 @@ if __name__ == "__main__":
     if not SEOJI_CERT_KEY:
         print("⚠️  SEOJI_CERT_KEY가 없습니다. 전체 쪽수 자동 입력이 동작하지 않습니다.")
     with http.server.ThreadingHTTPServer(("", PORT), Handler) as httpd:
-        print(f"Serving 미완독묘 on http://localhost:{PORT}/  (Ctrl+C to stop)")
+        print(f"Serving 읽다말다 on http://localhost:{PORT}/  (Ctrl+C to stop)")
         httpd.serve_forever()
