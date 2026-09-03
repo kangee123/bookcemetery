@@ -1730,7 +1730,7 @@
   <div class="sheet-overlay" id="detailOverlay">
     <div class="sheet">
       <div class="sheet-head">
-        <p>책 정보</p>
+        <p id="detailHeadTitle">책 정보</p>
         <button class="sheet-close" id="detailClose" aria-label="닫기">✕</button>
       </div>
       <div class="sheet-body">
@@ -3141,12 +3141,13 @@
     detailReadInput.value = book.pagesRead || '';
   }
 
-  function openDetail(id, status){
+  function openDetail(id, status, fromPick){
     const source = status === 'done' ? archive : books;
     const book = source.find(b => b.id === id);
     if (!book) return;
     detailBookId = id;
     detailStatus = book.finishedAt ? 'done' : 'reading';
+    document.getElementById('detailHeadTitle').textContent = fromPick ? '오늘, 이 책은 어떠세요?' : '책 정보';
     renderDetail(book);
     // an already-finished book has nothing left to "mark as read"
     document.getElementById('detailMarkReadBtn').style.display = detailStatus === 'done' ? 'none' : '';
@@ -3244,7 +3245,7 @@
         setTimeout(() => {
           current.el.classList.remove('roulette-landed');
           rouletteRunning = false;
-          openDetail(order[targetIdx].id);
+          openDetail(order[targetIdx].id, undefined, true);
         }, 900);
         return;
       }
